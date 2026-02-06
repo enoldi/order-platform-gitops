@@ -2,9 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [ "develop" ]
-  pull_request:
-    branches: [ "develop" ]
+    branches: ["develop"]
 
 permissions:
   contents: read
@@ -19,7 +17,17 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+
+      - name: Checkout application repo (contains Gradle + Dockerfiles)
+        uses: actions/checkout@v4
+        with:
+          repository: <ORG_OR_USER>/<APP_REPO_NAME>
+          ref: develop
+          path: app
+          # If the app repo is private and not accessible via GITHUB_TOKEN, replace with:
+          # token: ${{ secrets.REPO_READ_TOKEN }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -29,17 +37,27 @@ jobs:
           cache: gradle
 
       - name: Build + Test
+        working-directory: app
         run: ./gradlew clean test
 
       - name: Build JARs
+        working-directory: app
         run: ./gradlew :apps:gateway:bootJar :apps:order-service:bootJar :apps:payment-service:bootJar :apps:inventory-service:bootJar :apps:notification-service:bootJar
 
   docker-build-scan-push:
     runs-on: ubuntu-latest
     needs: build-test
-    if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+
+      - name: Checkout application repo (contains Gradle + Dockerfiles)
+        uses: actions/checkout@v4
+        with:
+          repository: enoldi/order-platform
+          ref: develop
+          path: app
+          # token: ${{ secrets.REPO_READ_TOKEN }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -50,16 +68,18 @@ jobs:
 
       - name: Set image tag
         id: vars
-        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+        run: echo "TAG=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build images
+        working-directory: app
         run: |
           docker build -t $IMAGE_PREFIX/gateway:${{ steps.vars.outputs.TAG }} -f apps/gateway/Dockerfile .
           docker build -t $IMAGE_PREFIX/order-service:${{ steps.vars.outputs.TAG }} -f apps/order-service/Dockerfile .
           docker build -t $IMAGE_PREFIX/payment-service:${{ steps.vars.outputs.TAG }} -f apps/payment-service/Dockerfile .
           docker build -t $IMAGE_PREFIX/inventory-service:${{ steps.vars.outputs.TAG }} -f apps/inventory-service/Dockerfile .
           docker build -t $IMAGE_PREFIX/notification-service:${{ steps.vars.outputs.TAG }} -f apps/notification-service/Dockerfile .
-      - name: Trivy scan (fail on HIGH/CRITICAL)
+
+      - name: Trivy scan (gateway)
         uses: aquasecurity/trivy-action@0.24.0
         with:
           scan-type: image
