@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: order-platform-dev
+  name: order-platform-staging
   namespace: argocd
 spec:
   project: default
@@ -11,7 +11,7 @@ spec:
     path: gitops/helm/services
     helm:
       valueFiles:
-        - ../../envs/dev/values.yaml
+        - ../../envs/staging/values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: demo-stg
