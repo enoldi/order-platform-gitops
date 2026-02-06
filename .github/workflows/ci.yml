@@ -23,7 +23,7 @@ jobs:
       - name: Checkout application repo (contains Gradle + Dockerfiles)
         uses: actions/checkout@v4
         with:
-          repository: <ORG_OR_USER>/<APP_REPO_NAME>
+          repository: enoldi/order-platform
           ref: develop
           path: app
           # If the app repo is private and not accessible via GITHUB_TOKEN, replace with:
