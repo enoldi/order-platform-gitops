@@ -1,0 +1,61 @@
+namespace: demo
+
+images:
+  prefix: ghcr.io/enoldi/order-platform
+  tag: "dev"
+  pullPolicy: IfNotPresent
+
+global:
+  rabbit:
+    host: rabbitmq.demo.svc.cluster.local
+    userSecretkey: RABBIT_USER
+    passSecretKey: RABBIT_PASS
+
+  secretsName: demo-secrets
+
+services:
+  gateway:
+    name: gateway
+    port: 8080
+    nodePort: 30080
+    replicas: 1
+    paths:
+      - /api/v1/orders/**
+      - /api/v1/payments/**
+      - /api/v1/inventory/**
+      - /api/v1/notifications/**
+
+  orders:
+    name: order-service
+    port: 8081
+    replicas: 1
+    db:
+      host: order-postgres.demo.svc.cluster.local
+      dbname: orderdb
+      userSecretkey: ORDER_DB_USER
+      passSecretKey: ORDER_DB_PASS
+
+  payment:
+    name: payment-service
+    port: 8082
+    replicas: 1
+    db:
+      host: payment-postgres.demo.svc.cluster.local
+      dbname: paymentdb
+      userSecretkey: PAYMENT_DB_USER
+      passSecretKey: PAYMENT_DB_PASS
+
+  inventory:
+    name: inventory-service
+    port: 8083
+    replicas: 1
+    db:
+      host: inventory-postgres.demo.svc.cluster.local
+      dbname: inventorydb
+      userSecretkey: INVENTORY_DB_USER
+      passSecretKey: INVENTORY_DB_PASS
+
+  notification:
+    name: notification-service
+    port: 8084
+    replicas: 1

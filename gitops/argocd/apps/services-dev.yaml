@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: order-platform-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/enoldi/order-platform-gitops.git
+    targetRevision: develop
+    path: gitops/helm/services
+    helm:
+      valueFiles:
+        - ../../envs/dev/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

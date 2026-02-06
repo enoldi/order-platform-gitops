@@ -1,0 +1,24 @@
+{{- $ns := .Values.namespace -}}
+
+{{- range $key, $svc := .Values.services }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.name }}
+  namespace: {{ $ns }}
+spec:
+  selector:
+    app: {{ $svc.name }}
+  {{- if eq $key "gateway" }}
+  type: NodePort
+  {{- else }}
+  type: ClusterIP
+  {{- end }}
+  ports:
+  - port: {{ $svc.port }}
+    targetPort: {{ $svc.port }}
+    {{- if eq $key "gateway" }}
+    nodePort: {{ $svc.nodePort | default 30080 }}
+      {{- end }}
+---
+{{- end }}

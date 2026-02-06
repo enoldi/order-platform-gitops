@@ -1,0 +1,98 @@
+{{- $ns := .Values.namespace -}}
+{{- $secrets := .Values.global.secretsName -}}
+{{- $imgPrefix := .Values.images.prefix -}}
+{{- $imgTag := .Values.images.tag -}}
+{{- $pull := .Values.images.pullPolicy -}}
+
+{{- range $key, $svc := .Values.services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}-deployment
+  namespace: {{ $ns }}
+  labels:
+    {{- include "svc.labels" (dict "name" $svc.name) | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $svc.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svc.name }}
+        {{- include "svc.labels" (dict "name" $svc.name) | nindent 8 }}
+    spec:
+      containers:
+      - name: app
+        image: "{{ $imgPrefix }}/{{ $svc.name }}:{{ $imgTag }}"
+        imagePullPolicy: {{ $pull }}
+        ports:
+          - containerPort: {{ $svc.port }}
+        env:
+          - name: SECRET_PORT
+            value: {{ $svc.port }}
+
+          #rabbitmq (all services use it)
+          - name: SPRING_RABBITMQ_HOST
+            value: {{ $.Values.global.rabbit.host }}
+          - name: SPRING_RABBITMQ_USERNAME
+            valueFrom: secretKeyRef: { name: {{ $secrets }}, key: {{ $.Values.global.rabbit.userSecretKey}} }}
+          - name: SPRING_RABBITMQ_PASSWORD
+            valueFrom: { secretKeyRef: { name: {{ $secrets }}, key: {{ $.Values.global.rabbit.passSecretKey}} }}
+
+        {{- if hasKey $svc "db" }}
+          - name: SPRING_DATASOURCE_URL
+            value: "jdbc:postgresql://{{ $svc.db.host }}:5432/{{ $svc.db.dbname }}"
+          - name: SPRING_DATASOURCE_USERNAME
+            valueFrom: { secretKeyRef: { name: {{ $secrets }}, key: {{ $svc.db.userSecretKey}} }}
+          - name: SPRING_DATASOURCE_PASSWORD
+            valueFrom: { secretKeyRef: { name: {{ $secrets }}, key: {{ $svc.db.passSecretKey}} }}
+        {{- end }}
+
+        # Gateway route (only gateway uses it)
+        {{- if eq $key "gateway" }}
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_0_URI
+            value: "http://{{ $.Values.services.order.name }}:{{ $.Values.services.order.port }}"
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0
+            value: "Path=/api/v1/orders/**"
+
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_1_URI
+            value: "http://{{ $.Values.services.payment.name }}:{{ $.Values.services.payment.port }}"
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0
+            value: "Path=/api/v1/payments/**"
+
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_2_URI
+            value: "http://{{ $.Values.services.inventory.name }}:{{ $.Values.services.inventory.port }}"
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0
+            value: "Path=/api/v1/inventory/**"
+
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_3_URI
+            value: "http://{{ $.Values.services.notification.name }}:{{ $.Values.services.notification.port }}"
+          - name: SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0
+            value: "Path=/api/v1/notifications/**"
+        {{- end }}
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ $svc.port }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: {{ $svc.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+{{- end }}
+

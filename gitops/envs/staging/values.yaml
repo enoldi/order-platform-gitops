@@ -1,0 +1,24 @@
+namespace: demo-staging
+image:
+  prefix: ghcr.io/enoldi/order-platform
+  tag: "stg-abcdf1"
+  pullPolicy: IfNotPresent
+
+global:
+  secretsName: order-platform-secrets
+  rabbit:
+    host: rabbitmq.demo.svc.cluster.local
+    userSecretKey: RABBIT_USER
+    passSecretKey: RABBIT_PASS
+
+service:
+  gateways:
+    port: 8080
+  order:
+    port: 8081
+  payment:
+    port: 8082
+  inventory:
+    port: 8083
+  notification:
+    port: 8084
